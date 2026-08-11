@@ -1,26 +1,238 @@
-from fastapi import FastAPI
-from app.api.auth import router as auth_router
-from app.core.database import Base, engine
+from fastapi import FastAPI, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from database import SessionLocal, engine, Base
+from models import User, Itinerary
+from schemas import (
+    UserCreate,
+    UserLogin,
+    ItineraryCreate
+)
 
 Base.metadata.create_all(bind=engine)
-
 app = FastAPI(
     title="Travel Itinerary Planning and Sharing Platform",
+    description="Backend API for creating, managing and sharing travel plans",
     version="1.0.0"
 )
 
-app.include_router(auth_router)
 
 
-@app.get("/")
-def home():
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+@app.get(
+    "/",
+    tags=["System"],
+    summary="API Welcome Message",
+    operation_id="welcome_message"
+)
+def root():
     return {
-        "message": "Welcome to Travel Itinerary Planning and Sharing Platform"
+        "message": "Welcome to Travel Itinerary Platform API"
     }
 
 
-@app.get("/health")
+
+@app.get(
+    "/health",
+    tags=["System"],
+    summary="Check API Health",
+    operation_id="health_check"
+)
 def health():
     return {
         "status": "OK"
+    }
+
+
+
+@app.post(
+    "/register",
+    tags=["User Management"],
+    summary="Register New User",
+    operation_id="register_user"
+)
+def register(
+    user_data: UserCreate,
+    db: Session = Depends(get_db)
+):
+
+    existing_user = db.query(User).filter(
+        User.email == user_data.email
+    ).first()
+
+
+    if existing_user:
+        raise HTTPException(
+            status_code=400,
+            detail="Email already exists"
+        )
+
+
+    user = User(
+        username=user_data.username,
+        email=user_data.email,
+        password=user_data.password
+    )
+
+
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+
+    return {
+        "message": "User registered successfully",
+        "user_id": user.id
+    }
+
+
+
+@app.post(
+    "/login",
+    tags=["User Management"],
+    summary="User Login",
+    operation_id="login_user"
+)
+def login(
+    user_data: UserLogin,
+    db: Session = Depends(get_db)
+):
+
+    user = db.query(User).filter(
+        User.email == user_data.email,
+        User.password == user_data.password
+    ).first()
+
+
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid email or password"
+        )
+
+
+    return {
+        "message": "Login successful",
+        "user_id": user.id,
+        "username": user.username
+    }
+
+
+
+
+@app.post(
+    "/itineraries",
+    tags=["Itinerary Management"],
+    summary="Create New Travel Plan",
+    operation_id="create_travel_plan"
+)
+def create_itinerary(
+    itinerary_data: ItineraryCreate,
+    owner_id: int,
+    db: Session = Depends(get_db)
+):
+
+    itinerary = Itinerary(
+        special_name=itinerary_data.special_name,
+        title=itinerary_data.title,
+        destination=itinerary_data.destination,
+        start_date=itinerary_data.start_date,
+        end_date=itinerary_data.end_date,
+        description=itinerary_data.description,
+        budget=itinerary_data.budget,
+        owner_id=owner_id
+    )
+
+
+    db.add(itinerary)
+    db.commit()
+    db.refresh(itinerary)
+
+
+    return {
+        "message": "Travel plan created successfully",
+        "itinerary_id": itinerary.id
+    }
+
+
+
+@app.get(
+    "/itineraries",
+    tags=["Itinerary Management"],
+    summary="View All Travel Plans",
+    operation_id="view_all_travel_plans"
+)
+def get_all_travel_plans(
+    db: Session = Depends(get_db)
+):
+
+    itineraries = db.query(Itinerary).all()
+
+    return itineraries
+
+
+
+@app.get(
+    "/itineraries/{itinerary_id}",
+    tags=["Itinerary Management"],
+    summary="View Travel Plan Details",
+    operation_id="view_travel_plan_details"
+)
+def get_travel_plan_details(
+    itinerary_id: int,
+    db: Session = Depends(get_db)
+):
+
+    itinerary = db.query(Itinerary).filter(
+        Itinerary.id == itinerary_id
+    ).first()
+
+
+    if not itinerary:
+        raise HTTPException(
+            status_code=404,
+            detail="Travel plan not found"
+        )
+
+
+    return itinerary
+
+
+
+@app.delete(
+    "/itineraries/{itinerary_id}",
+    tags=["Itinerary Management"],
+    summary="Remove Travel Plan",
+    operation_id="remove_travel_plan"
+)
+def remove_travel_plan(
+    itinerary_id: int,
+    db: Session = Depends(get_db)
+):
+
+    itinerary = db.query(Itinerary).filter(
+        Itinerary.id == itinerary_id
+    ).first()
+
+
+    if not itinerary:
+        raise HTTPException(
+            status_code=404,
+            detail="Travel plan not found"
+        )
+
+
+    db.delete(itinerary)
+    db.commit()
+
+
+    return {
+        "message": "Travel plan removed successfully"
     }
