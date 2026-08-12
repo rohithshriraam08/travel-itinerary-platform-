@@ -33,7 +33,6 @@ class User(Base):
     )
 
 
-
 # =========================
 # ITINERARY TABLE
 # =========================
@@ -63,18 +62,15 @@ class Itinerary(Base):
     )
 
     start_date = Column(
-        String(30),
-        nullable=True
+        String(30)
     )
 
     end_date = Column(
-        String(30),
-        nullable=True
+        String(30)
     )
 
     description = Column(
-        Text,
-        nullable=True
+        Text
     )
 
     budget = Column(
@@ -84,6 +80,42 @@ class Itinerary(Base):
 
     owner_id = Column(
         Integer,
-        ForeignKey("users.id"),
-        nullable=True
+        ForeignKey("users.id")
+    )
+
+
+# =========================
+# ACTIVITY TABLE
+# =========================
+
+class Activity(Base):
+    __tablename__ = "activities"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    itinerary_id = Column(
+        Integer,
+        ForeignKey("itineraries.id"),
+        nullable=False
+    )
+
+    name = Column(
+        String(150),
+        nullable=False
+    )
+
+    location = Column(
+        String(150)
+    )
+
+    date = Column(
+        String(30)
+    )
+
+    description = Column(
+        Text
     )
